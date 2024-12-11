@@ -4,15 +4,23 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "AlchemyBaseDataAsset.h"
+#include "AlchemyReagentEntry.h"
 #include "AlchemyReagent.generated.h"
 
 UCLASS()
-class ALCHEMYRUN_API UAlchemyReagent : public UPrimaryDataAsset
+class ALCHEMYRUN_API AAlchemyReagent : public AActor
 {
 	GENERATED_BODY()
-	
-public:	
-	// Sets default values for this actor's properties
-	UAlchemyReagent();
 
+public:
+	// Reagent entry data asset
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ContentAlchemy")
+	UAlchemyReagentEntry* ReagentEntry;
+
+	AAlchemyReagent();
+
+	// Override BeginPlay to add custom generation logging
+	virtual void BeginPlay() override;
 };
+
