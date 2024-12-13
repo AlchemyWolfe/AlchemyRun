@@ -1,38 +1,47 @@
-// Copyright Alchemy Wolfe.  All Rights Reserved.
+// Copyright Alchemy Wolfe. All Rights Reserved.
 
 #include "AlchemyCatalog.h"
-#include "AlchemyReagentEntry.h"
-#include "Math/UnrealMathUtility.h"
 
-TArray<UAlchemyReagentEntry*> UAlchemyCatalog::GetReagentsByAllTags(TArray<FName>& RequiredTags)
+UAlchemyCatalog::UAlchemyCatalog()
 {
-	TArray<UAlchemyReagentEntry*> MatchingReagents;
-	for (UAlchemyReagentEntry* Reagent : Reagents)
-	{
-		bool bAllTagsMatch = true;
-		for (const FName& Tag : RequiredTags)
-		{
-			if (!Reagent->Tags.Contains(Tag))
-			{
-				bAllTagsMatch = false;
-				break;
-			}
-		}
-
-		if (bAllTagsMatch)
-		{
-			MatchingReagents.Add(Reagent);
-		}
-	}
-	return MatchingReagents;
 }
 
-UAlchemyReagentEntry* UAlchemyCatalog::GetRandomReagentFromList(TArray<UAlchemyReagentEntry*>& ReagentList)
+void UAlchemyCatalog::AddReagentToTagList(TSoftObjectPtr<AActor> Reagent, const FName& Tag)
 {
-	if (ReagentList.Num() == 0)
+	if (Reagent.IsValid())  // Ensure the reagent is valid
 	{
-		return nullptr;
+		if (!TagIndex.Contains(Tag))
+		{
+			TagIndex.Add(Tag, TSet<TSoftObjectPtr<AActor>>());
+		}
+		TagIndex[Tag].Add(Reagent);
 	}
-	int32 RandomIndex = FMath::RandRange(0, ReagentList.Num() - 1);
-	return ReagentList[RandomIndex];
+}
+
+TArray<TSoftObjectPtr<AActor>> UAlchemyCatalog::GetReagentsByTags(const TArray<FName>& Tags) const
+{
+	TArray<TSoftObjectPtr<AActor>> Result;
+
+	// If there are no tags, return an empty result
+	if (Tags.Num() == 0)
+	{
+		return Result;
+	}
+
+	// Start with the set of reagents for the first tag
+	TSet<TSoftObjectPtr<AActor>> ReagentsSet = TagIndex.Contains(Tags[0]) ? TagIndex[Tags[0]] : TSet<TSoftObjectPtr<AActor>>();
+
+	// Intersect with reagents for each subsequent tag
+	for (int32 i = 1; i < Tags.Num(); i++)
+	{
+		if (TagIndex.Contains(Tags[i]))
+		{
+			ReagentsSet = ReagentsSet.Intersect(TagIndex[Tags[i]]);
+		}
+	}
+
+	// Convert the TSet to a TArray for the result
+	Result.Append(ReagentsSet.Array());
+
+	return Result;
 }

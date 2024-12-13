@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "CollisionShape.h"
+#include "Components/BoxComponent.h"
 #include "AlchemyRecipe.generated.h"
 
 class UAlchemyCatalog;
@@ -29,13 +29,22 @@ public:
 
 	// List of reagents created by this recipe
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ContentAlchemy")
-	TArray<AAlchemyReagent*> CreatedReagents;
+	TArray<AActor*> CreatedReagents;
 
 	// Clear created reagents
 	UFUNCTION(BlueprintCallable, Category = "ContentAlchemy")
-	virtual void ClearReagents();
+	void ClearReagents();
+
+	// Creates an Actor from an AlchemyReagentEntry
+	UFUNCTION(BlueprintCallable, Category = "ContentAlchemy")
+	AAlchemyReagent* SpawnReagent(UAlchemyReagentEntry* ReagentEntry, float RotationIncrement = 0.0f, FVector RelativeLocation = FVector::ZeroVector, FRotator RelativeRotation = FRotator::ZeroRotator);
 
 	// Generate reagents within a given footprint
+	// Returns the Parent it used.  Some recipes may create a Cauldron for grouping.
 	UFUNCTION(BlueprintCallable, Category = "ContentAlchemy")
-	virtual void GenerateReagents(AAlchemyReagent* Parent/*, FCollisionShape Footprint*/);
+	virtual AAlchemyReagent* GenerateReagents(int32 Seed, AAlchemyReagent* Parent, UBoxComponent* FillBox, const FString& CauldronName);
+
+protected:
+	AAlchemyReagent* ParentReagent;
+	FRandomStream RandomStream;
 };

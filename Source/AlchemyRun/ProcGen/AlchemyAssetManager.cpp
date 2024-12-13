@@ -1,93 +1,55 @@
 // Copyright Alchemy Wolfe.  All Rights Reserved.
 
 #include "AlchemyAssetManager.h"
-#include "AlchemyReagentEntry.h"
-#include "AlchemyCatalog.h"
-#include "Engine/Engine.h"
+#include "Engine/StreamableManager.h"
+#include "Engine/AssetManager.h"
 
 UAlchemyAssetManager& UAlchemyAssetManager::Get()
 {
-	UAlchemyAssetManager* This = Cast<UAlchemyAssetManager>(GEngine->AssetManager);
-
-	if (This)
-	{
-		return *This;
-	}
-	else
-	{
-        UE_LOG(LogTemp, Fatal, TEXT("Invalid AlchemyReagentManager in DefaultEngine.ini, Must set this to AlchemyReagentManager"));
-		return *NewObject<UAlchemyAssetManager>();
-	}
-}
-
-TArray<UAlchemyReagentEntry*> UAlchemyAssetManager::GetReagentsByAllTags(const TArray<FName>& RequiredTags)
-{
-    TArray<UAlchemyReagentEntry*> MatchingReagents;
-    // Logic to find matching reagents
-    return MatchingReagents;
-}
-
-TArray<UAlchemyReagentEntry*> UAlchemyAssetManager::GetReagentsByAnyTag(const TArray<FName>& Tags)
-{
-    TArray<UAlchemyReagentEntry*> MatchingReagents;
-    // Logic to find matching reagents
-    return MatchingReagents;
-}
-
-UAlchemyReagentEntry* UAlchemyAssetManager::GetRandomReagentByAllTags(const TArray<FName>& RequiredTags)
-{
-    TArray<UAlchemyReagentEntry*> Reagents = GetReagentsByAllTags(RequiredTags);
-    if (Reagents.Num() == 0)
+    UAlchemyAssetManager* Instance = Cast<UAlchemyAssetManager>(GEngine->AssetManager);
+    if (!Instance)
     {
-        return nullptr;
+        UE_LOG(LogTemp, Fatal, TEXT("AlchemyAssetManager is not initialized properly. Make sure it is set in the project settings."));
+        return *NewObject<UAlchemyAssetManager>();
     }
-    int32 RandomIndex = FMath::RandRange(0, Reagents.Num() - 1);
-    return Reagents[RandomIndex];
+    return *Instance;
 }
 
-UAlchemyReagentEntry* UAlchemyAssetManager::GetRandomReagentByAnyTag(const TArray<FName>& Tags)
+void UAlchemyAssetManager::StartInitialLoading()
 {
-    TArray<UAlchemyReagentEntry*> Reagents = GetReagentsByAnyTag(Tags);
-    if (Reagents.Num() == 0)
+    Super::StartInitialLoading();
+
+    // Placeholder for preloading catalogs or collections
+    UE_LOG(LogTemp, Log, TEXT("AlchemyAssetManager: Initial loading started."));
+}
+
+UObject* UAlchemyAssetManager::LoadAssetSynchronously(const FString& AssetPath)
+{
+    FSoftObjectPath SoftObjectPath(AssetPath);
+    UObject* LoadedAsset = SoftObjectPath.TryLoad();
+    if (!LoadedAsset)
     {
-        return nullptr;
+        UE_LOG(LogTemp, Warning, TEXT("Failed to synchronously load asset: %s"), *AssetPath);
     }
-    int32 RandomIndex = FMath::RandRange(0, Reagents.Num() - 1);
-    return Reagents[RandomIndex];
+    return LoadedAsset;
 }
 
-TArray<UAlchemyCatalog*> UAlchemyAssetManager::GetCatalogsByAllTags(const TArray<FName>& RequiredTags)
+void UAlchemyAssetManager::LoadAssetAsynchronously(const FString& AssetPath, TFunction<void(UObject*)> OnLoadComplete)
 {
-    TArray<UAlchemyCatalog*> MatchingCatalogs;
-    // Logic to find matching catalogs
-    return MatchingCatalogs;
-}
+    FSoftObjectPath SoftObjectPath(AssetPath);
 
-TArray<UAlchemyCatalog*> UAlchemyAssetManager::GetCatalogsByAnyTag(const TArray<FName>& Tags)
-{
-    TArray<UAlchemyCatalog*> MatchingCatalogs;
-    // Logic to find matching catalogs
-    return MatchingCatalogs;
-}
-
-UAlchemyCatalog* UAlchemyAssetManager::GetRandomCatalogByAllTags(const TArray<FName>& RequiredTags)
-{
-    TArray<UAlchemyCatalog*> Catalogs = GetCatalogsByAllTags(RequiredTags);
-    if (Catalogs.Num() == 0)
+    //FStreamableManager& StreamableManager = UAssetManager::GetStreamableManager();
+    StreamableManager.RequestAsyncLoad(SoftObjectPath, [OnLoadComplete, SoftObjectPath]()
     {
-        return nullptr;
-    }
-    int32 RandomIndex = FMath::RandRange(0, Catalogs.Num() - 1);
-    return Catalogs[RandomIndex];
-}
-
-UAlchemyCatalog* UAlchemyAssetManager::GetRandomCatalogByAnyTag(const TArray<FName>& Tags)
-{
-    TArray<UAlchemyCatalog*> Catalogs = GetCatalogsByAnyTag(Tags);
-    if (Catalogs.Num() == 0)
-    {
-        return nullptr;
-    }
-    int32 RandomIndex = FMath::RandRange(0, Catalogs.Num() - 1);
-    return Catalogs[RandomIndex];
+        UObject* LoadedAsset = SoftObjectPath.ResolveObject();
+        if (LoadedAsset)
+        {
+            OnLoadComplete(LoadedAsset);
+        }
+        else
+        {
+            UE_LOG(LogTemp, Warning, TEXT("Failed to asynchronously load asset: %s"), *SoftObjectPath.ToString());
+            OnLoadComplete(nullptr);
+        }
+    });
 }

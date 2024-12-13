@@ -20,10 +20,17 @@ public:
 	UPROPERTY(EditAnywhere, Category = "ContentAlchemy")
 	UAlchemyReagentEntry* FillBrick; // Called brick because it implies rectangular tiling.
 
-	/**
-	 * Generates children reagents in a grid pattern within the given space.
-	 * @param Parent The parent reagent for the generated children.
-	 * @param Footprint The area within which the reagents should be generated.
-	 */
-	virtual void GenerateReagents(AAlchemyReagent* Parent/*, const FCollisionShape& Footprint*/) override;
+	UPROPERTY(EditAnywhere, Category = "ContentAlchemy")
+	float FillBrickRotationIncrement = 90.0f;
+
+	UPROPERTY(EditAnywhere, Category = "ContentAlchemy")
+	TArray<UAlchemyReagentEntry*> Decorations;
+
+	UPROPERTY(EditAnywhere, Category = "ContentAlchemy")
+	float DecorationChance = 0.2f;
+
+	UPROPERTY(EditAnywhere, Category = "ContentAlchemy")
+	float DecorationRotationIncrement = 90.0f;
+
+	virtual AAlchemyReagent* GenerateReagents(int32 Seed, AAlchemyReagent* Parent, UBoxComponent* FillBox, const FString& CauldronName) override;
 };

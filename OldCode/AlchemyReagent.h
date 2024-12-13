@@ -14,10 +14,6 @@ class ALCHEMYRUN_API AAlchemyReagent : public AActor
 	GENERATED_BODY()
 
 public:
-	// Reagent entry data asset
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ContentAlchemy")
-	UAlchemyReagentEntry* ReagentEntry;
-
 	AAlchemyReagent();
 
 	// Override BeginPlay to add custom generation logging
