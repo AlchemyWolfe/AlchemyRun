@@ -16,7 +16,7 @@ class ALCHEMYRUN_API AAlchemist : public AActor
 public:
     AAlchemist();
 
-    UPROPERTY(EditAnywhere, Category = "Generation")
+    UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Generation", meta = (AllowPrivateAccess = "true"))
     UBoxComponent* FillBox;
 
     UPROPERTY(EditAnywhere, Category = "Generation")

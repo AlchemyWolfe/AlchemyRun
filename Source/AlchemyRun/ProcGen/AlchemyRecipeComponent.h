@@ -35,14 +35,14 @@ protected:
     bool bGenerated;
 
     //  This is the function that actually spawns the Reagents.  Override this with procedural generation logic.
-    void GenerateReagentsImpl(AActor* Parent, UBoxComponent* FillBox);
-
-    // Creates an Actor from an AlchemyReagentEntry
-    UFUNCTION(BlueprintCallable, Category = "AlchemyRecipe")
-    AActor* SpawnReagent(float RotationIncrement = 0.0f, FVector RelativeLocation = FVector::ZeroVector, FRotator RelativeRotation = FRotator::ZeroRotator);
+    virtual void GenerateReagentsImpl(AActor* Parent, UBoxComponent* FillBox);
 
     // Cleanup previously generated actors
     UFUNCTION(BlueprintCallable, Category = "AlchemyRecipe")
     void ClearGeneratedActors();
+
+    // Creates an Actor from a StaticMesh
+    AActor* SpawnStaticMesh(UStaticMesh* Mesh, FVector Location, FRotator Rotation);
+
 };
 

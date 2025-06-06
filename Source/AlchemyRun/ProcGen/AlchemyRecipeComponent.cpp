@@ -27,13 +27,6 @@ void UAlchemyRecipeComponent::GenerateReagentsImpl(AActor* Parent, UBoxComponent
 {
 }
 
-AActor* UAlchemyRecipeComponent::SpawnReagent(float RotationIncrement, FVector RelativeLocation,
-	FRotator RelativeRotation)
-{
-	FActorSpawnParameters SpawnParams;
-	return nullptr;//GetWorld()->SpawnActor<AActor>(SomeActorClass, Location, Rotation, SpawnParams);
-}
-
 void UAlchemyRecipeComponent::ClearGeneratedActors()
 {
 	for (AActor* Actor : GeneratedActors)
@@ -45,4 +38,23 @@ void UAlchemyRecipeComponent::ClearGeneratedActors()
 	}
 	GeneratedActors.Empty();
 	bGenerated = false;
+}
+
+AActor* UAlchemyRecipeComponent::SpawnStaticMesh(UStaticMesh* Mesh, FVector Location, FRotator Rotation)
+{
+	if (!Mesh || !GetWorld()) return nullptr;
+
+	FActorSpawnParameters Params;
+	AActor* SpawnedActor = GetWorld()->SpawnActor<AActor>(AActor::StaticClass(), Location, Rotation, Params);
+	if (!SpawnedActor) return nullptr;
+
+	UStaticMeshComponent* MeshComp = NewObject<UStaticMeshComponent>(SpawnedActor);
+	MeshComp->SetStaticMesh(Mesh);
+	MeshComp->RegisterComponent();
+	MeshComp->AttachToComponent(SpawnedActor->GetRootComponent(), FAttachmentTransformRules::KeepRelativeTransform);
+
+	SpawnedActor->SetRootComponent(MeshComp);
+	GeneratedActors.Add(SpawnedActor);
+
+	return SpawnedActor;
 }

@@ -8,21 +8,21 @@ AlchemyRecipeComponent - contains info and procedures necessary for generation.
 		Actors that do have an AlchemyRecipeComponent, which will be used by Alchemist in the breadth first generation, and possibly in the future for delayed generation.
 	A boolean marking if actors have been generated for this recipe.
 
-AlchemyCollection - contains relates assets that could be swapped out for each other, such as all the Actors that are shrubbery. 
+AlchemyCollection - contains related assets that could be swapped out for each other, such as all the Actors that are shrubbery. 
 	Optimize for speed of getting a random element.
 
 AlchemyCatalog - contains related assets, such as walls & floors to make rooms and hallways with.  Some of these may be AlchemyCollections.
 	Optimize for speed of lookup by tags.  Maybe actually preparse into lists defined by tag?
 
-Alchemist - The thing that is put in a level that will generate Actors on level load, when palced in a level, or when the designer causes it to refresh
+Alchemist - The thing that is put in a level that will generate Actors on level load, when placed in a level, or when the designer causes it to refresh
 	Breadth first generation: The generation routine completes the top level recipe, keeping a list of any Actors that have AlchemyRecipeComponent that have non zero lists of children that have recipies.
 	Slow generation: I want the level to essentially animate into existence.  It would be nice if there was a 0.5 second animation that played of the Actor growing from 1% to 110% scale, then back to 100% scale, and that there was a 0.005 second delay in the generation of each Actor.
 
 AlchemyAssetManager : public UAssetManager - Not necessary yet, but by the time the game is published, I want to be able to only load Actors that I wish to use.  Perhaps Catalogs anbd Collections all load in the beginning, but actual Actors (or meshes and textures?) will only load when generated.
 
-AlchemyRecipeComponent Interaction:  There will be some need to get AlchemyCatalog information from parent recipies.  For example, there could be different walls, floors, lighting, etc. for dungeons based on different themes: blue, ice, lava, wood, marble, etc.  The recipe for the Dungeon will have the AlchemyCatalog for the theme, and pass it to every room recipe.  It will never communicate with adjacent recipies.  No room will reference another room.
+AlchemyRecipeComponent Interaction:  There will be some need to get AlchemyCatalog information from parent recipes.  For example, there could be different walls, floors, lighting, etc. for dungeons based on different themes: blue, ice, lava, wood, marble, etc.  The recipe for the Dungeon will have the AlchemyCatalog for the theme, and pass it to every room recipe.  It will never communicate with adjacent recipies.  No room will reference another room.
 
-Circular dependencies should be designer prevented.  There is a conceptual hierarchy of recipies.  For example, a dungeon will never make another dungeon, nor will a room make a dungeon.  I do not think we need code for this.
+Circular dependencies should be designer prevented.  There is a conceptual hierarchy of recipes.  For example, a dungeon will never make another dungeon, nor will a room make a dungeon.  I do not think we need code for this.
 
 Partial Regeneration: This is why AlchemyRecipeComponent contains the list of all Actors that were generated for that recipe.  While Alchemist will be the one calling GenerateReagents, Alchemist will be able to regenerate everything from a specific AlchemyRecipeComponent down without altering any other recipe.
 

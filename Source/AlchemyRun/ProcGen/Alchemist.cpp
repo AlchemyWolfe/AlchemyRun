@@ -8,6 +8,10 @@
 AAlchemist::AAlchemist()
 {
     PrimaryActorTick.bCanEverTick = false;
+    
+    FillBox = CreateDefaultSubobject<UBoxComponent>(TEXT("FillBox"));
+    FillBox->SetupAttachment(RootComponent);
+
     GenerationSeed = 12345;
     AnimationDuration = 0.5f;
     SpawnDelay = 0.005f;
