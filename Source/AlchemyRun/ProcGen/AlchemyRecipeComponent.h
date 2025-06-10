@@ -24,6 +24,10 @@ public:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AlchemyRecipe")
     TArray<AActor*> GeneratedActors;
 
+    // Cleanup previously generated actors
+    UFUNCTION(BlueprintCallable, Category = "AlchemyRecipe")
+    void ClearGeneratedActors();
+
 protected:
     // Called when the component is about to be destroyed
     virtual void BeginDestroy() override;
@@ -37,12 +41,10 @@ protected:
     //  This is the function that actually spawns the Reagents.  Override this with procedural generation logic.
     virtual void GenerateReagentsImpl(AActor* Parent, UBoxComponent* FillBox);
 
-    // Cleanup previously generated actors
-    UFUNCTION(BlueprintCallable, Category = "AlchemyRecipe")
-    void ClearGeneratedActors();
-
     // Creates an Actor from a StaticMesh
-    AActor* SpawnStaticMesh(UStaticMesh* Mesh, FVector Location, FRotator Rotation);
+    AActor* SpawnStaticMesh(UStaticMesh* Mesh, USceneComponent* AttachParent, const FString& Name, FVector LocalLocation, FRotator LocalRotation);
 
+    // Creates an Actor from an ActorClass
+    AActor* SpawnActor(const TSubclassOf<AActor>& ActorClass, USceneComponent* AttachParent, const FString& Name, const FVector& LocalLocation, const FRotator& LocalRotation);
 };
 

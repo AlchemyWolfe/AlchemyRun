@@ -20,9 +20,13 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Tiles")
 	UStaticMesh* WallTile;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Tiles")
+	float WallOffset;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Tiles")
 	UStaticMesh* CornerTile;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Tiles")
+	FVector2D CornerOffset;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Tiles")
 	UStaticMesh* DoorTile;
@@ -41,7 +45,4 @@ protected:
 private:
 	float GridSize;
 	FVector Origin;
-
-	void PlaceTile(UStaticMesh* Mesh, FVector Location, FRotator Rotation);
-	FVector GetBoxBottomOrigin(UBoxComponent* Box);
 };

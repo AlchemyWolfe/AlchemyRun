@@ -15,17 +15,26 @@ class ALCHEMYRUN_API AAlchemist : public AActor
 
 public:
     AAlchemist();
-
-    UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Generation", meta = (AllowPrivateAccess = "true"))
+    
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Generation", meta = (AllowPrivateAccess = "true"))
     UBoxComponent* FillBox;
 
     UPROPERTY(EditAnywhere, Category = "Generation")
     int32 GenerationSeed;
 
+    static int32 GetNextUniqueId();
+
 protected:
+    virtual void OnConstruction(const FTransform& Transform) override;
     virtual void BeginPlay() override;
 
 private:
+    UFUNCTION(CallInEditor, Category = "Generation")
+    void RegenerateLevel();
+    UFUNCTION(CallInEditor, Category = "Generation")
+    void ClearLevel();
+
+    void EnqueueTopLevelRecipies();
     void GenerateLevel();
     void ClearGeneratedActors();
     void GenerateBreadthFirst();
@@ -40,5 +49,8 @@ private:
 
     UPROPERTY(EditAnywhere, Category = "Generation")
     float SpawnDelay;
+
+    TQueue<UAlchemyRecipeComponent*> RecipeQueue;
+    static int32 GlobalUniqueId;
 };
 

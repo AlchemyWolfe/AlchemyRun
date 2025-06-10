@@ -32,7 +32,7 @@ public:
 
     // Not exactly the weight.  We get a random from 0.0 to 0.1, and check the smallest chances first, by enum order.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AlchemyCollection")
-    float Chance;
+    float Chance = 0.1f;
 };
 
 // The point of an Alchemy Collection is to have a place to group Reagents of the same type based on a kind of rarity.
