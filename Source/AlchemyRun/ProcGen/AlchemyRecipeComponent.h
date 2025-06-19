@@ -42,9 +42,15 @@ protected:
     virtual void GenerateReagentsImpl(AActor* Parent, UBoxComponent* FillBox);
 
     // Creates an Actor from a StaticMesh
-    AActor* SpawnStaticMesh(UStaticMesh* Mesh, USceneComponent* AttachParent, const FString& Name, FVector LocalLocation, FRotator LocalRotation);
+    AActor* SpawnStaticMesh(UStaticMesh* Mesh, USceneComponent* AttachParent, const FString& Name, const FVector& LocalLocation, const FRotator& LocalRotation);
 
     // Creates an Actor from an ActorClass
     AActor* SpawnActor(const TSubclassOf<AActor>& ActorClass, USceneComponent* AttachParent, const FString& Name, const FVector& LocalLocation, const FRotator& LocalRotation);
+
+    // Creates a Reagent Actor from a StaticMesh
+    AActor* SpawnReagent(UStaticMesh* Mesh, USceneComponent* AttachParent, const FString& Name, const FVector& LocalLocation, const FRotator& LocalRotation);
+
+    // Creates a Reagent Actor from an ActorClass
+    AActor* SpawnReagent(const TSubclassOf<AActor>& ActorClass, USceneComponent* AttachParent, const FString& Name, const FVector& LocalLocation, const FRotator& LocalRotation);
 };
 

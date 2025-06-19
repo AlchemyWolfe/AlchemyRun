@@ -13,6 +13,11 @@ AAlchemist::AAlchemist()
 
     USceneComponent* Root = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
     RootComponent = Root;
+
+    FillBox = CreateDefaultSubobject<UBoxComponent>(TEXT("FillBox"));
+    FillBox->SetupAttachment(RootComponent);
+    FillBox->SetBoxExtent(FVector(6000.f, 6000.f, 500.f));
+    FillBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     
     GenerationSeed = 12345;
     AnimationDuration = 0.5f;
