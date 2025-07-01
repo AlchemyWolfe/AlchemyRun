@@ -22,8 +22,6 @@ public:
     UPROPERTY(EditAnywhere, Category = "Generation")
     int32 GenerationSeed;
 
-    static int32 GetNextUniqueId();
-
 protected:
     virtual void OnConstruction(const FTransform& Transform) override;
     virtual void BeginPlay() override;
@@ -50,7 +48,7 @@ private:
     UPROPERTY(EditAnywhere, Category = "Generation")
     float SpawnDelay;
 
+protected:
     TQueue<UAlchemyRecipeComponent*> RecipeQueue;
-    static int32 GlobalUniqueId;
 };
 

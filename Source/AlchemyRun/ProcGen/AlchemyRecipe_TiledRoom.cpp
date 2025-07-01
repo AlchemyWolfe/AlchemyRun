@@ -5,95 +5,126 @@
 #include "Components/StaticMeshComponent.h"
 #include "DrawDebugHelpers.h"
 #include "Blueprint/UserWidget.h"
+#include "UObject/UnrealTypePrivate.h"
+#include "UObject/UnrealType.h"
+#include "UObject/Class.h"
 
 UAlchemyRecipe_TiledRoom::UAlchemyRecipe_TiledRoom()
 {
     GridSize = 100.0f;
-    FloorTileGridSpan = 1;
 }
 
-void UAlchemyRecipe_TiledRoom::GenerateReagentsImpl(AActor* Parent, UBoxComponent* FillBox)
+void UAlchemyRecipe_TiledRoom::InitializeRecipe(int32 Seed, const AActor* Parent, UBoxComponent* FillBox)
 {
-    if (!FillBox)
-    {
-        return;
-    }
+    Super::InitializeRecipe(Seed, Parent, FillBox);
 
-    InitializeGridValues(Parent, FillBox);
+    FloorTileSize = FillExtent;
 
-    // Place tiles
-    FVector FloorTileSize = FloorSM->GetBoundingBox().GetSize();
-    FillGrid(FloorSM, 0, 0, GridMaxX, GridMaxY, -FloorTileSize.Z, FloorTileGridSpan);
-    SpawnSWCorner(CornerActor, 0, 0, 0);
-    SpawnNWCorner(CornerActor, GridMaxX, 0, 0);
-    SpawnNECorner(CornerActor, GridMaxX, GridMaxY, 0);
-    SpawnSECorner(CornerActor, 0, GridMaxY, 0);
-    FillNorthWall(WallActor, GridMaxX, 1, GridMaxY-1, 0);
-    FillSouthWall(WallActor, 0, 1, GridMaxY-1, 0);
-    FillEastWall(WallActor, GridMaxY, 1, GridMaxX-1, 0);
-    FillWestWall(WallActor, 0, 1, GridMaxX-1, 0);
-}
-
-void UAlchemyRecipe_TiledRoom::InitializeGridValues(const AActor* Parent, const UBoxComponent* FillBox)
-{
-    AttachParent = GetOwner()->GetRootComponent();
-    FillExtent = FillBox->GetScaledBoxExtent();
-    FillOrigin = -FillExtent;
-    //FillOrigin.Z += FillExtent.Z * 0.5f;
-    TileSize = FillExtent;
-
-    if (FloorSM != nullptr)
-    {
-        TileSize = FloorSM->GetBoundingBox().GetSize();
-    }
-    else if (FloorActor)
+    if (FloorActor)
     {
         // Try to get the default object for bounds info (not spawned yet)
-        AActor* DefaultActor = FloorActor->GetDefaultObject<AActor>();
-        if (DefaultActor)
+        FActorSpawnParameters Params;
+        Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+        AActor* TempActor = GetWorld()->SpawnActor<AActor>(FloorActor, FVector(0, 0, -100000), FRotator::ZeroRotator, Params);
+        if (TempActor)
         {
-            UPrimitiveComponent* PrimComp = Cast<UPrimitiveComponent>(DefaultActor->GetRootComponent());
-            if (PrimComp)
-            {
-                TileSize = PrimComp->Bounds.GetBox().GetSize();
-            }
+            FloorTileSize = TempActor->GetComponentsBoundingBox().GetSize();
+            TempActor->Destroy();
         }
     }
     
-    GridSize = TileSize.X / FloorTileGridSpan;
-    GridMaxX = static_cast<int32>(FillExtent.X * 2.f / TileSize.X) * FloorTileGridSpan - 1;
-    GridMaxY = static_cast<int32>(FillExtent.Y * 2.f / TileSize.X) * FloorTileGridSpan - 1;
+    GridSize = FloorTileSize.X;
+    GridMaxX = static_cast<int32>(FillExtent.X * 2.f / GridSize);
+    GridMaxY = static_cast<int32>(FillExtent.Y * 2.f / GridSize);
 
     GridInitialized = true;
 }
 
-void UAlchemyRecipe_TiledRoom::FillGrid(UStaticMesh* Mesh, int32 MinX, int32 MinY, int32 MaxX, int32 MaxY, float Z, int32 Step)
+void UAlchemyRecipe_TiledRoom::GenerateStructureReagentsImpl()
 {
-    if (Mesh == nullptr)
+    FillGrid(FloorActor, 0, 0, GridMaxX, GridMaxY, 0);
+    FillRing(WallActor, CornerActor, 0, 0, GridMaxX, GridMaxY, 0);
+}
+
+void UAlchemyRecipe_TiledRoom::GenerateRequiredReagentsImpl()
+{
+}
+
+void UAlchemyRecipe_TiledRoom::GenerateDecorationReagentsImpl()
+{
+}
+
+void UAlchemyRecipe_TiledRoom::FillGrid(const TSubclassOf<AActor>& ActorClass, int32 MinX, int32 MinY, int32 MaxX, int32 MaxY, float Z)
+{
+    if (ActorClass == nullptr)
     {
         return;
     }
     
-    FString SpawnName;
-    for (int32 X = MinX; X <= MaxX; X += Step)
+    FString NameTag;
+    for (int32 X = MinX; X <= MaxX; ++X)
     {
-        for (int32 Y = MinY; Y <= MaxY; Y += Step)
+        for (int32 Y = MinY; Y <= MaxY; ++Y)
         {
             FVector Location = GetGridLocation(X, Y, Z);
-            SpawnName = FString::Printf(TEXT("FloorSM_%d_%d"), X, Y);
-            SpawnReagent(Mesh, AttachParent, SpawnName, Location, FRotator::ZeroRotator);
+            NameTag = FString::Printf(TEXT("Floor_%d_%d"), X, Y);
+            SpawnReagent(ActorClass, NameTag, Location, FRotator::ZeroRotator);
         }
     }
 }
 
-void UAlchemyRecipe_TiledRoom::FillGrid(const TSubclassOf<AActor>& ActorClass, int32 MinX, int32 MinY, int32 MaxX, int32 MaxY, float Z, int32 Step)
+void UAlchemyRecipe_TiledRoom::FillRing(const TSubclassOf<AActor>& WallActorClass,
+    const TSubclassOf<AActor>& CornerActorClass, int32 MinX, int32 MinY, int32 MaxX, int32 MaxY, float Z)
 {
-    // Create is I ever use it.
+    int cornerBuffer = 0;
+    if (CornerActorClass != nullptr)
+    {
+        SpawnSWCorner(CornerActorClass, MinX, MinY, Z);
+        SpawnNWCorner(CornerActorClass, MaxX, MinY, Z);
+        SpawnNECorner(CornerActorClass, MaxX, MaxY, Z);
+        SpawnSECorner(CornerActorClass, MinX, MaxY, Z);
+        cornerBuffer = 1;
+    }
+    FillNorthWall(WallActorClass, MaxX, MinY+cornerBuffer, MaxY-cornerBuffer, Z);
+    FillSouthWall(WallActorClass, MinX, MinY+cornerBuffer, MaxY-cornerBuffer, Z);
+    FillEastWall(WallActorClass, MaxY, MinX+cornerBuffer, MaxX-cornerBuffer, Z);
+    FillWestWall(WallActorClass, MinY, MinX+cornerBuffer, MaxX-cornerBuffer, Z);
 }
 
-void UAlchemyRecipe_TiledRoom::FillNorthWall(UStaticMesh* Mesh, int32 X, int32 MinY, int32 MaxY, float Z)
+AActor* UAlchemyRecipe_TiledRoom::AddDoorwayInWall(int X, int Y, bool DoorExists)
 {
-    // Create is I ever use it.
+    FString NameTag = FString::Printf(TEXT("WallActor_%d_%d"), X, Y);
+    AActor* OldWallActor = FindReagent(NameTag, WallActor);
+    if (OldWallActor != nullptr)
+    {
+        NameTag = FString::Printf(TEXT("DoorwayActor_%d_%d"), X, Y);
+        AActor* NewDoorwayActor = SpawnReagentInPlaceOf(NameTag, DoorwayActor, OldWallActor);
+        if (NewDoorwayActor != nullptr && DoorExists)
+        {
+            FName VarName("DoorExists");
+            FProperty* Property = NewDoorwayActor->GetClass()->FindPropertyByName("DoorExists");
+            FBoolProperty* BoolProp = CastField<FBoolProperty>(Property);
+            if (BoolProp)
+            {
+                BoolProp->SetPropertyValue_InContainer(NewDoorwayActor, true);
+            }
+        }
+        return NewDoorwayActor;
+    }
+    return nullptr;
+}
+
+AActor* UAlchemyRecipe_TiledRoom::RemoveDoorwayInWall(int X, int Y)
+{
+    FString NameTag = FString::Printf(TEXT("DoorwayActor_%d_%d"), X, Y);
+    AActor* OldDoorwayActor = FindReagent(NameTag, DoorwayActor);
+    if (OldDoorwayActor != nullptr)
+    {
+        NameTag = FString::Printf(TEXT("WallActor_%d_%d"), X, Y);
+        AActor* NewWallActor = SpawnReagentInPlaceOf(NameTag, WallActor, OldDoorwayActor);
+        return NewWallActor;
+    }
+    return nullptr;
 }
 
 void UAlchemyRecipe_TiledRoom::FillNorthWall(const TSubclassOf<AActor>& ActorClass, int32 X, int32 MinY, int32 MaxY, float Z)
@@ -103,19 +134,14 @@ void UAlchemyRecipe_TiledRoom::FillNorthWall(const TSubclassOf<AActor>& ActorCla
         return;
     }
 
-    FString SpawnName;
+    FString NameTag;
     FRotator LocalRotation = FRotator(0, 180, 0);
     for (int32 Y = MinY; Y <= MaxY; Y++)
     {
-        FVector Location = GetGridLocation(X+1, Y, Z);
-        SpawnName = FString::Printf(TEXT("NWallActor_%d_%d"), X, Y);
-        SpawnReagent(ActorClass, AttachParent, SpawnName, Location, LocalRotation);
+        FVector Location = GetGridLocation(X+1, Y+1, Z);
+        NameTag = FString::Printf(TEXT("WallActor_%d_%d"), X, Y);
+        SpawnReagent(ActorClass, NameTag, Location, LocalRotation);
     }
-}
-
-void UAlchemyRecipe_TiledRoom::FillSouthWall(UStaticMesh* Mesh, int32 X, int32 MinY, int32 MaxY, float Z)
-{
-    // Create is I ever use it.
 }
 
 void UAlchemyRecipe_TiledRoom::FillSouthWall(const TSubclassOf<AActor>& ActorClass, int32 X, int32 MinY, int32 MaxY, float Z)
@@ -125,19 +151,14 @@ void UAlchemyRecipe_TiledRoom::FillSouthWall(const TSubclassOf<AActor>& ActorCla
         return;
     }
 
-    FString SpawnName;
+    FString NameTag;
     FRotator LocalRotation = FRotator(0, 0, 0);
     for (int32 Y = MinY; Y <= MaxY; Y++)
     {
-        FVector Location = GetGridLocation(X, Y+1, Z);
-        SpawnName = FString::Printf(TEXT("NWallActor_%d_%d"), X, Y);
-        SpawnReagent(ActorClass, AttachParent, SpawnName, Location, LocalRotation);
+        FVector Location = GetGridLocation(X, Y, Z);
+        NameTag = FString::Printf(TEXT("WallActor_%d_%d"), X, Y);
+        SpawnReagent(ActorClass, NameTag, Location, LocalRotation);
     }
-}
-
-void UAlchemyRecipe_TiledRoom::FillEastWall(UStaticMesh* Mesh, int32 Y, int32 MinX, int32 MaxX, float Z)
-{
-    // Create is I ever use it.
 }
 
 void UAlchemyRecipe_TiledRoom::FillEastWall(const TSubclassOf<AActor>& ActorClass, int32 Y, int32 MinX, int32 MaxX, float Z)
@@ -148,18 +169,13 @@ void UAlchemyRecipe_TiledRoom::FillEastWall(const TSubclassOf<AActor>& ActorClas
     }
 
     FString SpawnName;
-    FRotator LocalRotation = FRotator(0, 90, 0);
+    FRotator LocalRotation = FRotator(0, -90, 0);
     for (int32 X = MinX; X <= MaxX; X++)
     {
         FVector Location = GetGridLocation(X, Y+1, Z);
-        SpawnName = FString::Printf(TEXT("EWallActor_%d_%d"), X, Y);
-        SpawnReagent(ActorClass, AttachParent, SpawnName, Location, LocalRotation);
+        SpawnName = FString::Printf(TEXT("WallActor_%d_%d"), X, Y);
+        SpawnReagent(ActorClass, SpawnName, Location, LocalRotation);
     }
-}
-
-void UAlchemyRecipe_TiledRoom::FillWestWall(UStaticMesh* Mesh, int32 Y, int32 MinX, int32 MaxX, float Z)
-{
-    // Create is I ever use it.
 }
 
 void UAlchemyRecipe_TiledRoom::FillWestWall(const TSubclassOf<AActor>& ActorClass, int32 Y, int32 MinX, int32 MaxX, float Z)
@@ -170,18 +186,13 @@ void UAlchemyRecipe_TiledRoom::FillWestWall(const TSubclassOf<AActor>& ActorClas
     }
 
     FString SpawnName;
-    FRotator LocalRotation = FRotator(0, -90, 0);
+    FRotator LocalRotation = FRotator(0, 90, 0);
     for (int32 X = MinX; X <= MaxX; X++)
     {
         FVector Location = GetGridLocation(X+1, Y, Z);
-        SpawnName = FString::Printf(TEXT("EWallActor_%d_%d"), X, Y);
-        SpawnReagent(ActorClass, AttachParent, SpawnName, Location, LocalRotation);
+        SpawnName = FString::Printf(TEXT("WallActor_%d_%d"), X, Y);
+        SpawnReagent(ActorClass, SpawnName, Location, LocalRotation);
     }
-}
-
-void UAlchemyRecipe_TiledRoom::SpawnSWCorner(UStaticMesh* Mesh, int32 X, int32 Y, float Z)
-{
-    // Create is I ever use it.
 }
 
 void UAlchemyRecipe_TiledRoom::SpawnSWCorner(const TSubclassOf<AActor>& ActorClass, int32 X, int32 Y, float Z)
@@ -193,12 +204,7 @@ void UAlchemyRecipe_TiledRoom::SpawnSWCorner(const TSubclassOf<AActor>& ActorCla
 
     FVector Location = GetGridLocation(X, Y, Z);;
     FString SpawnName = FString::Printf(TEXT("SWCornerActor"));
-    SpawnReagent(ActorClass, AttachParent, SpawnName, Location, FRotator(0, 0, 0));
-}
-
-void UAlchemyRecipe_TiledRoom::SpawnNWCorner(UStaticMesh* Mesh, int32 X, int32 Y, float Z)
-{
-    // Create is I ever use it.
+    SpawnReagent(ActorClass, SpawnName, Location, FRotator(0, 0, 0));
 }
 
 void UAlchemyRecipe_TiledRoom::SpawnNWCorner(const TSubclassOf<AActor>& ActorClass, int32 X, int32 Y, float Z)
@@ -210,12 +216,7 @@ void UAlchemyRecipe_TiledRoom::SpawnNWCorner(const TSubclassOf<AActor>& ActorCla
 
     FVector Location = GetGridLocation(X+1, Y, Z);
     FString SpawnName = FString::Printf(TEXT("NWCornerActor"));
-    SpawnReagent(ActorClass, AttachParent, SpawnName, Location, FRotator(0, 90, 0));
-}
-
-void UAlchemyRecipe_TiledRoom::SpawnNECorner(UStaticMesh* Mesh, int32 X, int32 Y, float Z)
-{
-    // Create is I ever use it.
+    SpawnReagent(ActorClass, SpawnName, Location, FRotator(0, 90, 0));
 }
 
 void UAlchemyRecipe_TiledRoom::SpawnNECorner(const TSubclassOf<AActor>& ActorClass, int32 X, int32 Y, float Z)
@@ -227,12 +228,7 @@ void UAlchemyRecipe_TiledRoom::SpawnNECorner(const TSubclassOf<AActor>& ActorCla
 
     FVector Location = GetGridLocation(X+1, Y+1, Z);
     FString SpawnName = FString::Printf(TEXT("NECornerActor"));
-    SpawnReagent(ActorClass, AttachParent, SpawnName, Location, FRotator(0, 180, 0));
-}
-
-void UAlchemyRecipe_TiledRoom::SpawnSECorner(UStaticMesh* Mesh, int32 X, int32 Y, float Z)
-{
-    // Create is I ever use it.
+    SpawnReagent(ActorClass, SpawnName, Location, FRotator(0, 180, 0));
 }
 
 void UAlchemyRecipe_TiledRoom::SpawnSECorner(const TSubclassOf<AActor>& ActorClass, int32 X, int32 Y, float Z)
@@ -244,6 +240,5 @@ void UAlchemyRecipe_TiledRoom::SpawnSECorner(const TSubclassOf<AActor>& ActorCla
 
     FVector Location = GetGridLocation(X, Y+1, Z);
     FString SpawnName = FString::Printf(TEXT("SECornerActor"));
-    SpawnReagent(ActorClass, AttachParent, SpawnName, Location, FRotator(0, -90, 0));
+    SpawnReagent(ActorClass, SpawnName, Location, FRotator(0, -90, 0));
 }
-

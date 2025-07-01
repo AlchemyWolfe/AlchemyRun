@@ -5,8 +5,6 @@
 #include "TimerManager.h"
 #include "Kismet/GameplayStatics.h"
 
-int32 AAlchemist::GlobalUniqueId = 0;
-
 AAlchemist::AAlchemist()
 {
     PrimaryActorTick.bCanEverTick = false;
@@ -16,17 +14,12 @@ AAlchemist::AAlchemist()
 
     FillBox = CreateDefaultSubobject<UBoxComponent>(TEXT("FillBox"));
     FillBox->SetupAttachment(RootComponent);
-    FillBox->SetBoxExtent(FVector(6000.f, 6000.f, 500.f));
+    FillBox->SetBoxExtent(FVector(500.f * 3.5, 500.f * 3.5, 500.f));
     FillBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     
     GenerationSeed = 12345;
     AnimationDuration = 0.5f;
     SpawnDelay = 0.005f;
-}
-
-int32 AAlchemist::GetNextUniqueId()
-{
-    return ++GlobalUniqueId;
 }
 
 void AAlchemist::OnConstruction(const FTransform& Transform)
@@ -94,7 +87,10 @@ void AAlchemist::ProcessRecipe(UAlchemyRecipeComponent* Recipe)
         return;
     }
 
-    Recipe->GenerateReagents(RandomStream.GetUnsignedInt(), this, FillBox);
+    Recipe->InitializeRecipe(RandomStream.GetUnsignedInt(), this, FillBox);
+    Recipe->GenerateStructureReagents();
+    Recipe->GenerateRequiredReagents();
+    Recipe->GenerateDecorationReagents();
 
     for (AActor* Actor : Recipe->GeneratedActors)
     {
