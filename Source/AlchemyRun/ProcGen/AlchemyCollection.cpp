@@ -1,98 +1,125 @@
 // Copyright Alchemy Wolfe. All Rights Reserved.
 
-// Copyright Alchemy Wolfe. All Rights Reserved.
-
 #include "AlchemyCollection.h"
-#include "Engine/World.h"
-#include "Math/RandomStream.h"
 
-// Constructor
-UAlchemyCollection::UAlchemyCollection()
+#include "Alchemist.h"
+#include "AlchemyReagent.h"
+
+AAlchemyCollection::AAlchemyCollection()
 {
-    // Initialize the Reagents array with the number of rarities (this will work even if rarities are added in the future)
-    int32 NumRarities = static_cast<int32>(EAlchemyCollectionRarity::MaxRarities);
-    Reagents.SetNum(NumRarities);
-
-    // Set the weight for each rarity (0.01 * previous weight)
-    // For Common (index 0), set the weight to 1.0f
-    float PreviousChance = 1.0f;
-
-    // Loop through all rarities and assign the weight accordingly
-    for (int32 RarityIndex = 0; RarityIndex < NumRarities; ++RarityIndex)
-    {
-        Reagents[RarityIndex].Chance = PreviousChance;
-        PreviousChance *= 0.01f;  // Reduce weight for the next rarity
-    }
+    PrimaryActorTick.bCanEverTick = false;
 }
 
-EAlchemyCollectionRarity UAlchemyCollection::GetRandomRarity(FRandomStream& RandomStream) const
+TSubclassOf<AActor> AAlchemyCollection::GetChosenActorClass(TSubclassOf<AActor> ActorClass, FRandomStream& RandomStream)
 {
-    // Generate a random number between 0 and the 1
-    float RandomChance = RandomStream.FRand();
-
-    // Find which rarity that has entries corresponds to the generated random number
-    for (int32 RarityIndex = Reagents.Num() - 1; RarityIndex >= 0; --RarityIndex)
+    if (!ActorClass)
     {
-        if (Reagents[RarityIndex].Reagents.Num() > 0 && RandomChance <= Reagents[RarityIndex].Chance)
+        return nullptr;
+    }
+    int32 MaxDepthCheck = 100;
+
+    TSubclassOf<AActor> ChosenClass = ActorClass;
+    // Get default object (CDO) to access properties
+    AAlchemyReagent* ReagentCDO = Cast<AAlchemyReagent>(ChosenClass->GetDefaultObject());
+    while (ReagentCDO && ReagentCDO->SpawnCollection)
+    {
+        AAlchemyCollection* CollectionCDO = ReagentCDO->SpawnCollection->GetDefaultObject<AAlchemyCollection>();
+        TSubclassOf<AActor> NextClass = CollectionCDO ? CollectionCDO->GetRandomActorClass(RandomStream) : nullptr;
+        if (NextClass)
         {
-            return static_cast<EAlchemyCollectionRarity>(RarityIndex);
+            ChosenClass = NextClass;
+            ReagentCDO = Cast<AAlchemyReagent>(ChosenClass->GetDefaultObject());
+        }
+        else
+        {
+            break;
+        }
+        if (--MaxDepthCheck <= 0)
+        {
+            break;
         }
     }
 
-    return EAlchemyCollectionRarity::Common;    // We should never get here, but this is a safe return value.
+    return ChosenClass;
 }
 
-// Get a random reagent of any rarity based on the weights of each rarity
-TSoftObjectPtr<AActor> UAlchemyCollection::GetRandomReagent(FRandomStream& RandomStream) const
+TSubclassOf<AActor> AAlchemyCollection::GetChosenActorClass(FRandomStream& RandomStream)
 {
-    EAlchemyCollectionRarity Rarity = GetRandomRarity(RandomStream);
-    return GetRandomReagentOfRarity(RandomStream, Rarity);
+    TSubclassOf<AActor> ChosenClass = GetRandomActorClass(RandomStream);
+    return GetChosenActorClass(ChosenClass, RandomStream);
 }
 
-// Get a random reagent of a specific rarity
-TSoftObjectPtr<AActor> UAlchemyCollection::GetRandomReagentOfRarity(FRandomStream& RandomStream, EAlchemyCollectionRarity Rarity) const
+void AAlchemyCollection::BeginPlay()
 {
-    // Get the appropriate FAlchemyCollectionRarityData for the given rarity
-    const FAlchemyCollectionRarityData& RarityData = Reagents[static_cast<int32>(Rarity)];
+    Super::BeginPlay();
+    ReplaceAttempts = 0;
+    ReplaceThisActorWithOneFromActorEntries();
+}
 
-    // If the array of reagents for this rarity is not empty, pick a random one
-    if (RarityData.Reagents.Num() > 0)
+void AAlchemyCollection::Tick(float DeltaTime)
+{
+    Super::Tick(DeltaTime);
+    if (!SuccessfullyReplaced)
     {
-        int32 RandomIndex = RandomStream.RandRange(0, RarityData.Reagents.Num() - 1);
-        return RarityData.Reagents[RandomIndex];
-    }
-
-    // If no reagents, return a null pointer
-    return TSoftObjectPtr<AActor>();
-}
-
-// Add a reagent to a specific rarity
-void UAlchemyCollection::AddReagent(TSoftObjectPtr<AActor> Reagent, EAlchemyCollectionRarity Rarity)
-{
-    // Add the reagent to the corresponding rarity array in the Reagents list
-    Reagents[static_cast<int32>(Rarity)].Reagents.Add(Reagent);
-}
-
-void UAlchemyCollection::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
-{
-    Super::PostEditChangeProperty(PropertyChangedEvent);
-
-    // Calculate the number of rarities based on the enum
-    int32 NumRarities = static_cast<int32>(EAlchemyCollectionRarity::MaxRarities);
-
-    // If the number of rarities has increased, extend the Reagents array
-    if (Reagents.Num() < NumRarities)
-    {
-        int32 MissingRarities = NumRarities - Reagents.Num();
-        for (int32 i = 0; i < MissingRarities; ++i)
+        ReplaceThisActorWithOneFromActorEntries();
+        if (ReplaceAttempts > 5)
         {
-            // Add a new entry with default values for the new rarity
-            FAlchemyCollectionRarityData NewRarityData;
-            NewRarityData.Chance = 0.01f * Reagents.Last().Chance;  // Use a small weight value for new rarity
-            Reagents.Add(NewRarityData);
+            // We have nothing to replace ourselves with
+            Destroy();
         }
-
-        // Notify the designer that a new rarity has been added
-        UE_LOG(LogTemp, Warning, TEXT("New rarity added to AlchemyCollection: %s"), *GetName());
     }
+}
+
+void AAlchemyCollection::ReplaceThisActorWithOneFromActorEntries()
+{
+    ++ReplaceAttempts;
+    TSubclassOf<AActor> ReplacementClass = GetRandomActorClass(AAlchemist::RandomStream);
+
+    if (ReplacementClass && ReplacementClass != GetClass())
+    {
+        FTransform SpawnTransform = GetActorTransform();
+
+        FActorSpawnParameters SpawnParams;
+        SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+        AActor* Replacement = GetWorld()->SpawnActor<AActor>(ReplacementClass, SpawnTransform, SpawnParams);
+        if (Replacement)
+        {
+            Destroy();
+        }
+    }
+}
+
+TSubclassOf<AActor> AAlchemyCollection::GetRandomActorClass(FRandomStream& RandomStream)
+{
+    float TotalWeight = 0.f;
+    for (const FAlchemyActorEntry& Entry : ActorEntries)
+    {
+        if (Entry.ActorClass && Entry.Weight > 0.f)
+        {
+            TotalWeight += Entry.Weight;
+        }
+    }
+
+    if (TotalWeight <= 0.f)
+    {
+        return nullptr;
+    }
+
+    float Choice = RandomStream.FRandRange(0.f, TotalWeight);
+    float RunningWeight = 0.f;
+
+    for (const FAlchemyActorEntry& Entry : ActorEntries)
+    {
+        if (Entry.ActorClass && Entry.Weight > 0.f)
+        {
+            RunningWeight += Entry.Weight;
+            if (Choice <= RunningWeight)
+            {
+                return Entry.ActorClass;
+            }
+        }
+    }
+
+    return nullptr; // fallback (shouldn't happen unless all weights are 0.0)
 }

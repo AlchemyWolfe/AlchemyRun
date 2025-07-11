@@ -47,12 +47,12 @@ protected:
 	
 	inline FVector GetGridLocation(int32 x, int32 y, float z) const
 	{
-		return FillOrigin + FVector(x * GridSize, y * GridSize, z);
+		return GridOrigin + FVector(x * GridSize, y * GridSize, z);
 	}
 	
 	inline FVector GetGridLocationCenter(int32 x, int32 y, float z) const
 	{
-		return FillOrigin + FVector(x * GridSize + GridSize*0.5f, y * GridSize + GridSize*0.5f, z);
+		return GridOrigin + FVector(x * GridSize + GridSize*0.5f, y * GridSize + GridSize*0.5f, z);
 	}
 	
 protected:
@@ -61,4 +61,5 @@ protected:
 	int32 GridMaxX;
 	int32 GridMaxY;
 	FVector FloorTileSize;
+	FVector GridOrigin;	// Lower left in X,Y
 };

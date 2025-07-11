@@ -4,70 +4,51 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "UObject/Object.h"
 #include "GameFramework/Actor.h"
+#include "AlchemyEnums.h"
 #include "AlchemyCollection.generated.h"
 
-// Enum to define the rarity of the assets, only used inside UAlchemyCollection
-UENUM(BlueprintType)
-enum class EAlchemyCollectionRarity : uint8
-{
-    Common UMETA(DisplayName = "Common"),
-    Rare UMETA(DisplayName = "Rare"),
-    SuperRare UMETA(DisplayName = "Super Rare"),
-    MaxRarities UMETA(DisplayName = "Max Rarities")
-};
-
-// Only used inside UAlchemyCollection, this is just meant to sort Reagents into rarities, so random lookup
-// doesn't have to walk the entire list counting weights.
 USTRUCT(BlueprintType)
-struct FAlchemyCollectionRarityData
+struct FAlchemyActorEntry
 {
     GENERATED_BODY()
 
-public:
-    // List of Reagents for this rarity
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AlchemyCollection")
-    TArray<TSoftObjectPtr<AActor>> Reagents;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    TSubclassOf<AActor> ActorClass;
 
-    // Not exactly the weight.  We get a random from 0.0 to 0.1, and check the smallest chances first, by enum order.
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AlchemyCollection")
-    float Chance = 0.1f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.0", ClampMax = "1.0"))
+    float Weight = 1.0f;
 };
 
-// The point of an Alchemy Collection is to have a place to group Reagents of the same type based on a kind of rarity.
-// I expect this to be used to make a short list of Reagents to create a temporary AlchemyCatalog out of.
-// This temporary AlchemyCatalog will then be passed to child Recipes, so there is some consistency in generation.
-// It is possible also to create a short list of Reagents as a Collection to be passed to child Recipes.
-// Currently, all Reagents are AActors.  If we want the flexibility of using Collections as Reagents, then all we need
-// to do to this class is change the type of TSoftObjectPtr we use.
-UCLASS(Blueprintable)
-class ALCHEMYRUN_API UAlchemyCollection : public UObject
+UCLASS()
+class ALCHEMYRUN_API AAlchemyCollection : public AActor
 {
     GENERATED_BODY()
-    
-    UAlchemyCollection();
 
 public:
-    // Each rarity will have one list of Reagents for each rarity.
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AlchemyCollection")
-    TArray<FAlchemyCollectionRarityData> Reagents;
+    AAlchemyCollection();
 
-    // Returns a random rarity based on rarity chance
-    UFUNCTION(BlueprintCallable, Category = "AlchemyCollection")
-    EAlchemyCollectionRarity GetRandomRarity(FRandomStream& RandomStream) const;
-
-    // Returns a Reagent of any rarity.
-    UFUNCTION(BlueprintCallable, Category = "AlchemyCollection")
-    TSoftObjectPtr<AActor> GetRandomReagent(FRandomStream& RandomStream) const;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ContentAlchemy")
+    TArray<FAlchemyActorEntry> ActorEntries;
     
-    // Returns a Reagent of a specific rarity.
-    UFUNCTION(BlueprintCallable, Category = "AlchemyCollection")
-    TSoftObjectPtr<AActor> GetRandomReagentOfRarity(FRandomStream& RandomStream, EAlchemyCollectionRarity Rarity) const;
-
-    // Adds an actor to the given rarity collection.  I only see doing this to make a smaller curated list.
-    UFUNCTION(BlueprintCallable, Category = "AlchemyCollection")
-    void AddReagent(TSoftObjectPtr<AActor> Reagent, EAlchemyCollectionRarity Rarity);
+    // Resolves nested AAlchemyReagent selections until a final AActor class is chosen
+    static TSubclassOf<AActor> GetChosenActorClass(TSubclassOf<AActor> ReagentClass, FRandomStream& RandomStream);
     
-    virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
+    TSubclassOf<AActor> GetChosenActorClass(FRandomStream& RandomStream);
+    
+protected:
+    // Returns a random actor class from the collection, filtered by optional MaxRarity
+    UFUNCTION(BlueprintCallable, Category = "ContentAlchemy")
+    TSubclassOf<AActor> GetRandomActorClass(FRandomStream& RandomStream);
+
+    virtual void BeginPlay() override;
+    virtual void Tick(float DeltaTime) override;
+
+private:
+    // A collection, dropped into the world, will replace itself with one of the available actors, or destroy itself.
+    bool SuccessfullyReplaced;
+    int ReplaceAttempts;
+    
+    UFUNCTION(CallInEditor, Category = "ContentAlchemy")
+    void ReplaceThisActorWithOneFromActorEntries();
 };

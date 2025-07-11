@@ -24,13 +24,13 @@ class ALCHEMYRUN_API UAlchemyCatalog : public UObject
 public:
 	UAlchemyCatalog();
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AlchemyCatalog")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ContentAlchemy")
 	TArray<FName> AvailableTags;  // Tags available in this catalog
 
-	UFUNCTION(BlueprintCallable, Category = "AlchemyCatalog")
+	UFUNCTION(BlueprintCallable, Category = "ContentAlchemy")
 	void AddReagentToTagList(TSoftObjectPtr<AActor> Reagent, const FName& Tag);
 
-	UFUNCTION(BlueprintCallable, Category = "AlchemyCatalog")
+	UFUNCTION(BlueprintCallable, Category = "ContentAlchemy")
 	TArray<TSoftObjectPtr<AActor>> GetReagentsByTags(const TArray<FName>& Tags) const;
 
 protected:

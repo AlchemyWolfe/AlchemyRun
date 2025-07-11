@@ -9,12 +9,14 @@ UAlchemyRecipeComponent::UAlchemyRecipeComponent()
 	PrimaryComponentTick.bCanEverTick = false;
 }
 
-void UAlchemyRecipeComponent::InitializeRecipe(int32 Seed, const AActor* Parent, UBoxComponent* FillBox)
+void UAlchemyRecipeComponent::InitializeRecipe(int32 Seed, const AActor* Parent, UBoxComponent* NewFillBox)
 {
 	RandomStream.Initialize(Seed);
 	AttachParent = GetOwner()->GetRootComponent();
-	FillExtent = FillBox->GetScaledBoxExtent();
-	FillOrigin = -FillExtent;
+	if (NewFillBox)
+	{
+		FillBox = NewFillBox;
+	}
 }
 
 void UAlchemyRecipeComponent::GenerateStructureReagents()
@@ -44,10 +46,44 @@ void UAlchemyRecipeComponent::GenerateStructureReagentsImpl()
 
 void UAlchemyRecipeComponent::GenerateRequiredReagentsImpl()
 {
+	FVector Extent = FillBox->GetScaledBoxExtent();
+	for (const FAlchemyReagentSpec& Spec : RequiredReagents)
+	{
+		FVector SpawnLocation;
+		FRotator SpawnRotation;
+
+	    UE_LOG(LogTemp, Warning, TEXT("UAlchemyRecipeComponent::GenerateRequiredReagentsImpl for %s : %s"), *Spec.NameTag, *Spec.ActorClass->GetName());
+		if (AAlchemist::GetDesiredSpawnLocation(RandomStream, SpawnLocation, SpawnRotation,
+				Extent, GenerationEdgeBuffer, Spec.PlacementLocation, Spec.PlacementFacing, -1))
+		{
+			AActor* Spawned = AAlchemist::SpawnReagent(
+				Spec.ActorClass, Spec.NameTag, SpawnLocation, SpawnRotation, this);
+		}
+		else
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Failed to place required reagent: %s"), *Spec.NameTag);
+		}
+	}
 }
 
 void UAlchemyRecipeComponent::GenerateDecorationReagentsImpl()
 {
+	FVector Extent = FillBox->GetScaledBoxExtent();
+	for (const FAlchemyReagentSpec& Spec : DecorationReagents)
+	{
+		if (RandomStream.FRand() > 0.5f) // ~50% chance to place each decoration
+		{
+			FVector SpawnLocation;
+			FRotator SpawnRotation;
+
+			if (AAlchemist::GetDesiredSpawnLocation(RandomStream, SpawnLocation, SpawnRotation,
+				Extent, 50.0f))
+			{
+				AActor* Spawned = AAlchemist::SpawnReagent(
+					Spec.ActorClass, Spec.NameTag, SpawnLocation, SpawnRotation, this);
+			}
+		}
+	}
 }
 
 void UAlchemyRecipeComponent::ClearGeneratedActors()
@@ -60,78 +96,6 @@ void UAlchemyRecipeComponent::ClearGeneratedActors()
 		}
 	}
 	GeneratedActors.Empty();
-}
-
-AActor* UAlchemyRecipeComponent::SpawnReagent(UStaticMesh* Mesh, const FString& NameTag, const FVector& Location, const FRotator& Rotation, bool LocationIsLocal)
-{
-	if (!Mesh || !GetWorld()) return nullptr;
-
-	FTransform ParentTransform = AttachParent->GetComponentTransform();
-	FVector WorldLocation = LocationIsLocal ? ParentTransform.TransformPosition(Location) : Location;
-	FRotator WorldRotation = LocationIsLocal ? ParentTransform.TransformRotation(Rotation.Quaternion()).Rotator() : Rotation;
-
-	FActorSpawnParameters Params;
-	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	
-	// Spawn empty actor
-	AActor* SpawnedActor = GetWorld()->SpawnActor<AActor>(AActor::StaticClass(), WorldLocation, WorldRotation, Params);
-	if (!SpawnedActor) return nullptr;
-
-	SpawnedActor->Tags.Add(FName(NameTag));
-
-	// Create and attach mesh component
-	UStaticMeshComponent* MeshComp = NewObject<UStaticMeshComponent>(SpawnedActor);
-	MeshComp->SetStaticMesh(Mesh);
-	MeshComp->SetupAttachment(nullptr); // No parent yet
-	MeshComp->SetWorldLocation(WorldLocation);
-	MeshComp->SetWorldRotation(WorldRotation);
-	MeshComp->RegisterComponent();
-
-	// Set as root BEFORE attaching actor
-	SpawnedActor->SetRootComponent(MeshComp);
-
-	// Now attach to parent
-	SpawnedActor->AttachToComponent(AttachParent, FAttachmentTransformRules::KeepWorldTransform);
-
-	// Track the spawned actor
-	GeneratedActors.Add(SpawnedActor);
-
-	return SpawnedActor;
-}
-
-AActor* UAlchemyRecipeComponent::SpawnReagent(const TSubclassOf<AActor>& ActorClass,
-	const FString& NameTag, const FVector& Location, const FRotator& Rotation, bool LocationIsLocal)
-{
-	if (!GetWorld() || !ActorClass || !AttachParent) return nullptr;
-
-	FTransform ParentTransform = AttachParent->GetComponentTransform();
-	FVector WorldLocation = LocationIsLocal ? ParentTransform.TransformPosition(Location) : Location;
-	FRotator WorldRotation = LocationIsLocal ? ParentTransform.TransformRotation(Rotation.Quaternion()).Rotator() : Rotation;
-
-	FActorSpawnParameters Params;
-	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-
-	AActor* SpawnedActor = GetWorld()->SpawnActor<AActor>(ActorClass, WorldLocation, WorldRotation, Params);
-	if (!SpawnedActor) return nullptr;
-	SpawnedActor->Tags.Add(FName(NameTag));
-
-	SpawnedActor->AttachToComponent(AttachParent, FAttachmentTransformRules::KeepWorldTransform);
-	GeneratedActors.Add(SpawnedActor);
-
-	// Call Blueprint event: OnReagentSpawned(int32)
-	UFunction* InitFunc = SpawnedActor->FindFunction(FName("OnReagentSpawned"));
-	if (InitFunc)
-	{
-		struct
-		{
-			int32 Seed;
-		} SpawnedParams;
-		SpawnedParams.Seed = static_cast<int32>(RandomStream.GetUnsignedInt());
-
-		SpawnedActor->ProcessEvent(InitFunc, &SpawnedParams);
-	}
-	
-	return SpawnedActor;
 }
 
 AActor* UAlchemyRecipeComponent::FindReagent(const FString& SearchNameTag, const TSubclassOf<AActor>& SearchActorClass)
@@ -150,23 +114,6 @@ AActor* UAlchemyRecipeComponent::FindReagent(const FString& SearchNameTag, const
 		}
 	}
 	return nullptr;
-}
-
-AActor* UAlchemyRecipeComponent::SpawnReagentInPlaceOf(const FString& NewNameTag,
-                                                       const TSubclassOf<AActor>& NewActorClass, AActor* OldReagent)
-{
-	if (!NewActorClass || !OldReagent) return nullptr;
-
-	FVector Location = OldReagent->GetActorLocation();
-	FRotator Rotation = OldReagent->GetActorRotation();
-
-	// Destroy the old actor and remove it from the list
-	auto i = GeneratedActors.Find(OldReagent);
-	GeneratedActors.RemoveAt(i);
-	OldReagent->Destroy();
-
-	// Spawn and return the replacement
-	return SpawnReagent(NewActorClass, NewNameTag, Location, Rotation, false);
 }
 
 FVector UAlchemyRecipeComponent::GetActorClassBounds(const TSubclassOf<AActor>& ActorClass)
